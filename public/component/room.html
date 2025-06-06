@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>ห้องเกม Salem</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #ffffff;
+      color: rgb(0, 0, 0);
+      padding: 20px;
+    }
+
+    h2, h3 {
+      margin-bottom: 10px;
+    }
+
+    #player-list li {
+      margin: 5px 0;
+    }
+
+    #start-btn {
+      padding: 10px 20px;
+      font-size: 16px;
+      display: none;
+      margin-top: 20px;
+      background-color: #28a745;
+      border: none;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h2>ห้องเกม Salem</h2>
+  <h3 id="room-info">รหัสห้อง: </h3>
+  <h3 id="player-info">ชื่อผู้เล่น: </h3>
+
+  <h4>ผู้เล่นอื่น :</h4>
+  <ul id="player-list"></ul>
+
+  <button id="start-btn">เริ่มเกม</button>
+
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <script src="../js/room.js"></script>
+</body>
+</html>
