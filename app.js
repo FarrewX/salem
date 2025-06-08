@@ -7,6 +7,9 @@ const server = http.createServer(app)
 const { Server } = require("socket.io")
 const io = new Server(server, { pingInterval:2000, pingTimeout: 5000})
 
+const fs = require('fs');
+const path = require('path');
+
 const port = 3000
 
 app.use(express.static('public'))
@@ -26,7 +29,9 @@ server.listen(port, () => {
 console.log('server did loaded')
 
 const rooms = {};
-const backendPlayers = {}
+const backendPlayers = {};
+const playerSockets = {}; // ใช้ map ชื่อผู้เล่น -> socket
+const roomCleanupTimers = {}; // roomId -> timeout ID
 
 io.on('connection', (socket) => {
   console.log('User connected');
@@ -36,6 +41,10 @@ io.on('connection', (socket) => {
       socket.emit('error', 'ห้องนี้มีอยู่แล้ว');
       return;
     }
+
+    if (!playerSockets[roomId]) playerSockets[roomId] = {};
+    playerSockets[roomId][playerName] = socket;
+
 
     rooms[roomId] = {
       players: [playerName],
@@ -67,11 +76,15 @@ io.on('connection', (socket) => {
     socket.roomId = roomId;
     socket.playerName = playerName;
 
+    if (!playerSockets[roomId]) playerSockets[roomId] = {};
+    playerSockets[roomId][playerName] = socket;
+
+
     const isHost = (rooms[roomId].host === playerName);
     socket.emit('hostInfo', { isHost });
     io.to(roomId).emit('updatePlayers', rooms[roomId].players);
     io.to(roomId).emit('updatePlayerList', rooms[roomId].players);
-});
+  });
 
   socket.on('disconnect', (reason) => {
     console.log(reason)
@@ -79,20 +92,226 @@ io.on('connection', (socket) => {
     const playerName = socket.playerName;
 
     if (roomId && rooms[roomId]) {
+      // ลบ player ออกจากห้อง
       rooms[roomId].players = rooms[roomId].players.filter(p => p !== playerName);
+      delete playerSockets[roomId]?.[playerName];
 
       if (rooms[roomId].players.length === 0) {
-        delete rooms[roomId];
+        console.log(`🕒 ไม่มีผู้เล่นในห้อง ${roomId} กำลังรอลบข้อมูลใน 2 นาที`);
+        
+        // ตั้ง timeout ลบห้องหลังจาก 10 นาที (600,000 ms)
+        roomCleanupTimers[roomId] = setTimeout(() => {
+          console.log(`🧹 ลบห้อง ${roomId} และข้อมูลทั้งหมดแล้ว`);
+
+          delete rooms[roomId];
+          delete playerSockets[roomId];
+          delete backendPlayers[roomId];
+          delete roomCleanupTimers[roomId];
+
+          const filePath = path.join(__dirname, 'data', `${roomId}_roles.json`);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`🗑️ ลบไฟล์บทบาทของห้อง ${roomId} แล้ว`);
+          }
+        }, 10 * 60 * 200);
+
       } else {
         io.to(roomId).emit('updatePlayers', rooms[roomId].players);
         io.to(roomId).emit('updatePlayerList', rooms[roomId].players);
       }
+
     }
-    delete backendPlayers[socket.playerName]
+
+  delete backendPlayers[socket.playerName];
   });
-    setInterval(() => {
-    io.emit('updatePlayers', backendPlayers)
-  }, 150)
+
+  function generateDeck() {
+    const deck = [];
+    deck.push("แม่มด");
+    deck.push("ผู้ตรวจ");
+    for (let i = 0; i < 18; i++) {
+      deck.push("ชาวบ้าน");
+    }
+    return deck;
+  }
+
+  function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+
+  function dealCards(players) {
+    let deck = shuffle(generateDeck());
+    const roles = {};
+    players.forEach((playerName) => {
+      roles[playerName] = [];
+      for (let i = 0; i < 5; i++) {
+        roles[playerName].push(deck.pop());
+      }
+    });
+    return roles; // เช่น { "Alice": ["ชาวบ้าน", "แม่มด", ...], "Bob": [...] }
+  }
+
+  function findSocketByName(roomId, playerName) {
+    return playerSockets[roomId]?.[playerName];
+  }
+
+  function saveRolesToFile(roomId, roles) {
+    const dir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir); // สร้างโฟลเดอร์ถ้ายังไม่มี
+    }
+
+    const filePath = path.join(dir, `${roomId}_roles.json`);
+    const data = {
+      timestamp: new Date().toISOString(),
+      roles
+    };
+    fs.writeFileSync(filePath, JSON.stringify({ roles }, null, 2), 'utf8');
+  }
+
+  function loadRolesFromFile(roomId) {
+    const filePath = path.join(__dirname, 'data', `${roomId}_roles.json`);
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf8');
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.roles) return parsed.roles;
+        return parsed; // fallback
+      } catch (err) {
+        console.error("Error parsing JSON file:", err);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  // socket.on("joinPlaySession", ({ roomId, playerName }) => {
+  //   socket.playerName = playerName;
+  //   socket.roomId = roomId;
+
+  //   if (!rooms[roomId]) {
+  //     rooms[roomId] = { players: [], roles: {}, host: null };
+  //   }
+
+  //   if (!rooms[roomId].players.includes(playerName)) {
+  //     rooms[roomId].players.push(playerName);
+  //   }
+
+  //   socket.join(roomId);
+
+  //   io.to(roomId).emit("gameState", {
+  //     message: `${playerName} เข้าร่วมห้อง`,
+  //     players: rooms[roomId].players.map((playerName) => ({ playerName, status: "ปกติ" })),
+  //   });
+  // });
+
+  socket.on("startGame", ({ roomId , playerName }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+
+    if (socket.playerName !== room.host) {
+      socket.emit("error", "คุณไม่ใช่โฮสต์ ไม่สามารถเริ่มเกมได้");
+      return;
+    }
+
+    const roles = dealCards(room.players); // แจกไพ่ชีวิต 5 ใบ
+    rooms[roomId].roles = roles;
+
+    // 🔥 บันทึกลงไฟล์
+    saveRolesToFile(roomId, roles);
+
+    room.players.forEach((playerName) => {
+      const playerSocket = findSocketByName(roomId, playerName);
+      if (playerSocket) {
+        playerSocket.emit("yourRole", roles[playerName]);
+      }
+    });
+
+    console.log(`[${new Date().toLocaleString()}] แจกไพ่ให้ห้อง ${roomId}:`, roles);
+
+    io.to(roomId).emit("gameState", {
+      message: "เริ่มเกมแล้ว! แจกไพ่บทบาทเรียบร้อย",
+      players: room.players.map((playerName) => ({ playerName, status: "ปกติ" })),
+    });
+
+    io.to(roomId).emit("gameStarted");
+  });
+
+  socket.on("reconnectToRoom", ({ roomId, playerName }) => {
+    socket.playerName = playerName;
+    socket.roomId = roomId;
+
+    socket.join(roomId);
+    console.log(`${playerName} กลับเข้าห้อง ${roomId} อีกครั้ง`);
+
+    // ยกเลิกการลบห้อง
+    if (roomCleanupTimers[roomId]) {
+      clearTimeout(roomCleanupTimers[roomId]);
+      delete roomCleanupTimers[roomId];
+      console.log(`🚫 ยกเลิกการลบห้อง ${roomId} เพราะมีผู้เล่นกลับเข้ามา`);
+    }
+
+    // ⛳️ โหลด roles จากไฟล์
+    const roles = loadRolesFromFile(roomId);
+
+    // ✅ สร้าง room object ถ้าไม่มี
+    if (!rooms[roomId]) {
+      rooms[roomId] = {
+        players: [],
+        roles: roles || {},
+        host: null,
+      };
+    } else if (!rooms[roomId].roles && roles) {
+      rooms[roomId].roles = roles; // โหลดเข้า memory ถ้ายังไม่มี
+    }
+
+    // ✅ ใส่ player ลงใน room ถ้ายังไม่มี
+    if (!rooms[roomId].players.includes(playerName)) {
+      rooms[roomId].players.push(playerName);
+    }
+
+    // ส่งไพ่กลับให้ผู้เล่น
+    if (rooms[roomId].roles && rooms[roomId].roles[playerName]) {
+      socket.emit("yourRole", rooms[roomId].roles[playerName]);
+    } else {
+      console.warn(`⚠️ ไม่มีไพ่ของ ${playerName}`);
+    }
+    console.log(`ส่งไพ่ไปห้อง ${roomId}`,roles);
+
+    // ส่งสถานะเกมกลับให้ผู้เล่น
+    const players = rooms[roomId].players;
+    io.to(socket.id).emit("gameState", {
+      players: players.map((playerName) => ({ playerName, status: "ปกติ" })),
+    });
+    
+    io.to(roomId).emit('updatePlayers', rooms[roomId].players);
+  });
+
+  // socket.on("endGame", ({ roomId }) => {
+  //   if (!rooms[roomId]) return;
+
+  //   console.log(`🎯 เกมในห้อง ${roomId} จบแล้ว กำลังลบข้อมูลทั้งหมด`);
+
+  //   delete rooms[roomId];
+  //   delete playerSockets[roomId];
+  //   delete backendPlayers[roomId];
+
+  //   const filePath = path.join(__dirname, 'data', `${roomId}_roles.json`);
+  //   if (fs.existsSync(filePath)) {
+  //     fs.unlinkSync(filePath);
+  //     console.log(`🗑️ ลบไฟล์บทบาทของห้อง ${roomId} แล้ว`);
+  //   }
+
+  //   io.to(roomId).emit("gameEnded", { message: "เกมจบแล้ว ขอบคุณที่เล่น!" });
+  // });
 
   console.log(backendPlayers)
 });
+
+setInterval(() => {
+  io.emit('updatePlayers', backendPlayers);
+}, 150)

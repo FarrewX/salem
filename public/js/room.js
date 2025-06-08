@@ -88,8 +88,11 @@ socket.on("hostInfo", (data) => {
 
 // ปุ่มเริ่มเกม
 document.getElementById("start-btn").addEventListener("click", () => {
-  alert("เกมเริ่มต้นแล้ว!");
-  // TODO: เพิ่มการเปลี่ยนหน้าเกมจริงในอนาคต
+  socket.emit("startGame", { roomId });
+});
+
+socket.on("gameStarted", () => {
+  window.location.href = `../component/playsalem.html?roomId=${roomId}&name=${playerName}`;
 });
 
 // ถ้าเกิด error
