@@ -32,6 +32,7 @@ const rooms = {};
 const backendPlayers = {};
 const playerSockets = {}; // ใช้ map ชื่อผู้เล่น -> socket
 const roomCleanupTimers = {}; // roomId -> timeout ID
+const playerCount = 0;
 
 io.on('connection', (socket) => {
   console.log('User connected');
@@ -124,13 +125,45 @@ io.on('connection', (socket) => {
   delete backendPlayers[socket.playerName];
   });
 
-  function generateDeck() {
+  // function generateDeck() {
+  //   const deck = [];
+  //   deck.push("แม่มด");
+  //   deck.push("สายตรวจ");
+  //   for (let i = 0; i < 18; i++) {
+  //     deck.push("ชาวบ้าน");
+  //   }
+  //   return deck;
+  // }
+  
+  function generateDeck(playerCount) {
+    const totalCards = playerCount * 5;
+
+    // กำหนดจำนวนแม่มดกับสายตรวจตามจำนวนผู้เล่น
+    let numWitch = 1;
+
+    if (playerCount <= 5) numWitch = 1;
+    if (playerCount >= 6) numWitch = 2;
+
+    const cardsToRemove = numWitch + 1;
+    const finalCardCount = totalCards - cardsToRemove;
+
     const deck = [];
-    deck.push("แม่มด");
-    deck.push("สายตรวจ");
-    for (let i = 0; i < 18; i++) {
+
+    // เพิ่มไพ่แม่มด
+    for (let i = 0; i < numWitch; i++) {
+      deck.push("แม่มด");
+    }
+
+    // เพิ่มไพ่สายตรวจ
+    for (let i = 0; i < 1; i++) {
+      deck.push("สายตรวจ");
+    }
+
+    // เพิ่มไพ่ชาวบ้านให้ครบตามจำนวนที่เหลือ
+    for (let i = 0; i < finalCardCount; i++) {
       deck.push("ชาวบ้าน");
     }
+
     return deck;
   }
 
@@ -143,7 +176,7 @@ io.on('connection', (socket) => {
   }
 
   function dealCards(players) {
-    let deck = shuffle(generateDeck());
+    let deck = shuffle(generateDeck(players.length));
     const roles = {};
     players.forEach((playerName) => {
       roles[playerName] = [];
@@ -197,6 +230,7 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const playerCount = room.players.length;
     const roles = dealCards(room.players); // แจกไพ่ชีวิต 5 ใบ
     rooms[roomId].roles = roles;
 
