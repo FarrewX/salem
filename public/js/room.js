@@ -89,6 +89,11 @@ document.getElementById("start-btn").addEventListener("click", () => {
   socket.emit("startGame", { roomId });
 });
 
+document.getElementById("leave-btn").addEventListener("click", () => {
+  socket.emit("leaveRoom", { roomId, playerName });
+  window.location.href = "/";
+});
+
 socket.on("gameStarted", () => {
   window.location.href = `../component/playsalem.html?roomId=${roomId}&name=${playerName}`;
 });
