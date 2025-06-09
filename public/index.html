@@ -6,7 +6,8 @@
         font-family: sans-serif;
         padding: 20px;
         background-color: #494747;
-        color: #85735e;
+        color: #b7bbbe;
+        text-shadow: 10px 1px 0px #494949;
       }
 
       input, button {
@@ -56,12 +57,12 @@
 
 <style>
 .bg {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: url("https://mir-s3-cdn-cf.behance.net/project_modules/hd/e6ca9e36738259.5727c4e790a74.gif");
+  background-image: url("https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/061c5ef8-2616-48a4-af21-9f97322673b3/dfh1lkr-697d47f2-83ba-4c51-b946-5e3e8a09b2e4.gif?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzA2MWM1ZWY4LTI2MTYtNDhhNC1hZjIxLTlmOTczMjI2NzNiM1wvZGZoMWxrci02OTdkNDdmMi04M2JhLTRjNTEtYjk0Ni01ZTNlOGEwOWIyZTQuZ2lmIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.ovjcHpSffACBKemjuREadec3n6c4WRY8uPgZPCCrnGM");
   background-size: cover;
   background-position: center;
   /* border: solid blue; */
@@ -78,55 +79,52 @@
   margin-top: 30px;
   padding: 10px;
   width: 130px;
-  background-color: #795649; /* A dark wood-like brown */
-  color: #f4e5c3; /* A parchment-like off-white */
-  border: 2px solid #c0a080; /* A lighter brown border */
+  background-color: #616161; /* A dark wood-like brown */
+  color: #c9c9c9;
+  border: 2px solid #4d4d4d; /* A lighter brown border */
   font-family: 'Goudy Bookletter 1911', serif; /* A font with an old-style feel */
   font-size: 18px;
-  text-shadow: 1px 1px 0px #a67c52; /* Gives a bit of depth to the text */
-  box-shadow: 2px 2px 0px #a67c52; /* Simulates an inset look */
-  border-radius: 4px; /* Slightly rounded corners */
+  text-shadow: 1px 1px 0px #494949; /* Gives a bit of depth to the text */
+  box-shadow: 2px 2px 0px #505050; /* Simulates an inset look */
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
   
   .medieval-button:hover {
-    background-color: #857141; /* A lighter, worn wood color for hover */
-    box-shadow: 1px 1px 5px 0px rgba(0, 0, 0, 0.3); /* A more pronounced shadow for hover */
+    background-color: #738a92; 
+    box-shadow: 1px 1px 5px 0px rgba(0, 0, 0, 0.3); 
   }
   
   .medieval-button:active {
-    box-shadow: inset 1px 1px 2px 0px rgba(0, 0, 0, 0.5); /* An inset shadow for a pressed effect */
-    transform: translateY(2px); /* Moves the button down to simulate a press */
+    box-shadow: inset 1px 1px 2px 0px rgba(0, 0, 0, 0.5); 
+    transform: translateY(2px); 
   }
 
 .medieval-box {
     margin: 3px;
     padding: 10px 20px;
     width: 300px;
-    background-color: #795649; /* A dark wood-like brown */
-    color: #f4e5c3; /* A parchment-like off-white */
-    border: 2px solid #c0a080; /* A lighter brown border */
+    background-color: #616161; /* A dark wood-like brown */
+    color: #a9a9a9; /* A parchment-like off-white */
+    border: 2px solid #4d4d4d; /* A lighter brown border */
     font-family: 'Goudy Bookletter 1911', serif; /* A font with an old-style feel */
     font-size: 18px;
-    text-shadow: 1px 1px 0px #a67c52; /* Gives a bit of depth to the text */
-    box-shadow: 2px 2px 0px #a67c52; /* Simulates an inset look */
+    text-shadow: 1px 1px 0px #494949; /* Gives a bit of depth to the text */
+    box-shadow: 2px 2px 0px #505050; /* Simulates an inset look */
     border-radius: 4px; /* Slightly rounded corners */
     cursor: pointer;
     transition: all 0.3s ease;
   }
   
-  .medieval-box:hover {
-    background-color: #795649; /* A lighter, worn wood color for hover */
-  }
 
   .medieval-box::placeholder {
-    color: #aa9c7c;
+    color: #c9c9c9;
   }
 
   .medieval-box:focus {
     outline: none;
-    border-color: #c0a080; /* Highlight border on focus */
+    border-color: #5b8188; /* Highlight border on focus */
     box-shadow: 0 0 5px rgba(192, 160, 128, 0.5); /* Subtle glow effect */
   }
   

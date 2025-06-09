@@ -30,9 +30,46 @@
       border-radius: 5px;
       cursor: pointer;
     }
+
+  .bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url("https://sdmntprwestus3.oaiusercontent.com/files/00000000-917c-61fd-9c9d-dd7fd59d9d2a/raw?se=2025-06-09T07%3A15%3A51Z&sp=r&sv=2024-08-04&sr=b&scid=3229b34d-eb78-517d-ba00-aa53826ad433&skoid=864daabb-d06a-46b3-a747-d35075313a83&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-06-08T23%3A00%3A39Z&ske=2025-06-09T23%3A00%3A39Z&sks=b&skv=2024-08-04&sig=LGO2569ZTtmoRcHWBa%2BQ/P8liWIytasMCufbPP7nb6M%3D");
+    background-size: cover;
+    background-position: center;
+  }
+  .medieval-button {
+    margin: 3px;
+    margin-top: 30px;
+    padding: 10px;
+    width: 130px;
+    background-color: #616161; /* A dark wood-like brown */
+    color: #c9c9c9;
+    border: 2px solid #4d4d4d; /* A lighter brown border */
+    font-family: 'Goudy Bookletter 1911', serif; /* A font with an old-style feel */
+    font-size: 18px;
+    text-shadow: 1px 1px 0px #494949; /* Gives a bit of depth to the text */
+    box-shadow: 2px 2px 0px #505050; /* Simulates an inset look */
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .medieval-button:hover {
+    background-color: #738a92; 
+    box-shadow: 1px 1px 5px 0px rgba(0, 0, 0, 0.3); 
+  }
+  
+  .medieval-button:active {
+    box-shadow: inset 1px 1px 2px 0px rgba(0, 0, 0, 0.5); 
+    transform: translateY(2px); 
+  }
   </style>
 </head>
-<body>
+<body class="bg">
   <h2>ห้องเกม Salem</h2>
   <h3 id="room-info">รหัสห้อง: </h3>
   <h3 id="player-info">ชื่อผู้เล่น: </h3>
@@ -40,8 +77,8 @@
   <h4>ผู้เล่นอื่น :</h4>
   <ul id="player-list"></ul>
 
-  <button id="start-btn">เริ่มเกม</button>
-  <button id="leave-btn">ออกจากห้อง</button>
+  <button class="medieval-button" id="start-btn">เริ่มเกม</button>
+  <button class="medieval-button" id="leave-btn">ออกจากห้อง</button>
 
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <script src="../js/room.js"></script>
