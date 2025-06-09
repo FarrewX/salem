@@ -28,9 +28,7 @@ socket.on('updatePlayers', (backendPlayers) => {
     const backendPlayer = backendPlayers[playerName]
 
     if (!frontendPlayers[playerName]) {
-      frontendPlayers[playerName] = new Player({
-        playerName: backendPlayer.playerName
-      })
+      playerName: backendPlayer.playerName
 
       document.querySelector('#player-list').innerHTML += `<div data-playerName="${playerName}">${playerName} : 0</div>`
     } else {

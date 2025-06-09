@@ -20,7 +20,8 @@ socket.on("gameState", (data) => {
 socket.emit("reconnectToRoom", { roomId, playerName });
 
 socket.on("updatePlayers", (playerNames) => {
-  const playerList = playerNames.map(playerNames => ({ playerName: playerNames }));
+  // const playerList = playerNames.map(playerNames => ({ playerName: playerNames }));
+  const playerList = playerNames.map(name => ({ playerName: name }));
   renderPlayerCards(playerList);
 });
 

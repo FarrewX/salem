@@ -99,7 +99,6 @@ io.on('connection', (socket) => {
       if (rooms[roomId].players.length === 0) {
         console.log(`🕒 ไม่มีผู้เล่นในห้อง ${roomId} กำลังรอลบข้อมูลใน 2 นาที`);
         
-        // ตั้ง timeout ลบห้องหลังจาก 10 นาที (600,000 ms)
         roomCleanupTimers[roomId] = setTimeout(() => {
           console.log(`🧹 ลบห้อง ${roomId} และข้อมูลทั้งหมดแล้ว`);
 
@@ -113,7 +112,7 @@ io.on('connection', (socket) => {
             fs.unlinkSync(filePath);
             console.log(`🗑️ ลบไฟล์บทบาทของห้อง ${roomId} แล้ว`);
           }
-        }, 10 * 60 * 200);
+        }, 2 * 60 * 1000);
 
       } else {
         io.to(roomId).emit('updatePlayers', rooms[roomId].players);
@@ -128,7 +127,7 @@ io.on('connection', (socket) => {
   function generateDeck() {
     const deck = [];
     deck.push("แม่มด");
-    deck.push("ผู้ตรวจ");
+    deck.push("สายตรวจ");
     for (let i = 0; i < 18; i++) {
       deck.push("ชาวบ้าน");
     }
@@ -152,7 +151,7 @@ io.on('connection', (socket) => {
         roles[playerName].push(deck.pop());
       }
     });
-    return roles; // เช่น { "Alice": ["ชาวบ้าน", "แม่มด", ...], "Bob": [...] }
+    return roles; // { "player1": ["ชาวบ้าน", "แม่มด", ...], "player2": [...] }
   }
 
   function findSocketByName(roomId, playerName) {
@@ -188,26 +187,6 @@ io.on('connection', (socket) => {
     }
     return null;
   }
-
-  // socket.on("joinPlaySession", ({ roomId, playerName }) => {
-  //   socket.playerName = playerName;
-  //   socket.roomId = roomId;
-
-  //   if (!rooms[roomId]) {
-  //     rooms[roomId] = { players: [], roles: {}, host: null };
-  //   }
-
-  //   if (!rooms[roomId].players.includes(playerName)) {
-  //     rooms[roomId].players.push(playerName);
-  //   }
-
-  //   socket.join(roomId);
-
-  //   io.to(roomId).emit("gameState", {
-  //     message: `${playerName} เข้าร่วมห้อง`,
-  //     players: rooms[roomId].players.map((playerName) => ({ playerName, status: "ปกติ" })),
-  //   });
-  // });
 
   socket.on("startGame", ({ roomId , playerName }) => {
     const room = rooms[roomId];
