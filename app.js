@@ -36,13 +36,6 @@ const playerCount = 0;
 const hand = [];
 
 io.on('connection', (socket) => {
-  socket.on('updatePlayers', ({ roomId, playerName }) => {
-    if (rooms[roomId]?.roomState === 'started') {
-      socket.emit('error', 'ห้องนี้เริ่มเกมไปแล้ว');
-      return;
-    }
-  });
-
   socket.on('createRoom', ({ roomId, playerName }) => {
     if (rooms[roomId]) {
       socket.emit('error', 'ห้องนี้มีอยู่แล้ว');
@@ -90,6 +83,12 @@ io.on('connection', (socket) => {
     socket.emit('hostInfo', { isHost });
     io.to(roomId).emit('updatePlayers', rooms[roomId].players);
     io.to(roomId).emit('updatePlayerList', rooms[roomId].players);
+
+    const targetSocket = findSocketByName(roomId, playerName);
+      if (targetSocket) {
+        targetSocket.emit("forceDisconnect", { roomId, message: "ไม่พบชื่อผู้เล่น กรุณาเข้าผ่านลิงก์ที่ถูกต้อง" });
+        targetSocket.disconnect(true);
+      }
   });
 
   socket.on('disconnect', (reason) => {
@@ -327,7 +326,6 @@ io.on('connection', (socket) => {
     room.players.forEach((playerName, index) => {
       room.seatMap[playerName] = index;
     });
-    room.roomState = 'started';
 
     // 🔥 บันทึกลงไฟล์
     saveRolesToFile(roomId, roles);
@@ -369,6 +367,7 @@ io.on('connection', (socket) => {
 
     io.to(roomId).emit("gameStarted");
     io.to(roomId).emit("skillDeck", room.skillDeck);
+    io.to(roomId).emit("forceDisconnect", { message: "ห้องนี้เริ่มเกมแล้ว" })
   });
 
   socket.on("reconnectToRoom", ({ roomId, playerName }) => {
@@ -377,11 +376,6 @@ io.on('connection', (socket) => {
     socket.join(roomId);
     
     console.log(`${playerName} กลับเข้าห้อง ${roomId} อีกครั้ง`);
-
-    if (rooms[roomId]?.roomState === 'started') {
-      socket.emit('error', 'ห้องนี้เริ่มเกมไปแล้ว');
-      return;
-    }
 
     // ยกเลิกการลบห้อง
     if (roomCleanupTimers[roomId]) {
@@ -418,7 +412,13 @@ io.on('connection', (socket) => {
       socket.emit("yourRole", rooms[roomId].roles[playerName]);
     } else {
       console.warn(`⚠️ ไม่มีไพ่ของ ${playerName}`);
-      // console.alert("ไม่พบชื่อผู้เล่น กรุณาลองใหม่อีกครั้ง");
+
+      const targetSocket = findSocketByName(roomId, playerName);
+      if (targetSocket) {
+        targetSocket.emit("forceDisconnect", { roomId, message: "ไม่พบชื่อผู้เล่น กรุณาเข้าผ่านลิงก์ที่ถูกต้อง" });
+        targetSocket.disconnect(true);
+      }
+      // socket.disconnect(true);
     }
     // console.log(`ส่งไพ่ไปห้อง ${roomId}`,roles);
 

@@ -15,6 +15,11 @@ socket.on("connect", () => {
   }
 });
 
+socket.on("forceDisconnect", (data) => {
+  window.location.href = "/";
+  alert(data.message || "ไม่พบข้อมูลผู้เล่น");
+});
+
 // รับ role ที่ server ส่งกลับมา
 socket.on("yourRole", (roles) => {
   myRoles = roles;
@@ -34,14 +39,7 @@ socket.on("updatePlayers", (playerNames) => {
   renderPlayerCards(playerList);
 });
 
-if (!localStorage.getItem("hasReloaded")) {
-  localStorage.setItem("hasReloaded", "true");
-  setTimeout(() => {
-    location.reload();
-  }, 4000);
-}
-
-function renderPlayerCards(playerList = []) {
+function renderPlayerCards(playerList) {
   const container = document.getElementById("players-container");
   container.innerHTML = ""; // clear ก่อน
 
@@ -73,18 +71,13 @@ socket.on("skillDeck", (deck) => {
   console.log("ได้วางการ์ดสกิล:", deck);
   const deckskillContainer  = document.getElementById("cardContainer");
   deckskillContainer.innerHTML = "";
-  deck.forEach(cardskill => {
+  deck.forEach(SkillCard => {
     const cardDiv = document.createElement("div");
-  cardDiv.classList.add("SkillCard");
-  cardDiv.innerHTML = `
-    <strong>${cardskill.name}</strong><br>
-    <small>${cardskill.description}</small>
+    cardDiv.classList.add("SkillCard");
+    cardDiv.innerHTML = `
+    <strong>${SkillCard.name}</strong><br>
+    <small>${SkillCard.description}</small>
   `;
   deckskillContainer.appendChild(cardDiv);
   });
-});
-
-socket.on("initDeck", (deck) => {
-  window.currentDeck = deck;
-  renderDeck();
 });
