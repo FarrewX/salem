@@ -86,11 +86,10 @@ socket.on("hostInfo", (data) => {
 
 // ปุ่มเริ่มเกม
 document.getElementById("start-btn").addEventListener("click", () => {
-  socket.emit("startGame", { roomId });
+  socket.emit("startGame", { roomId, playerName });
 });
 
 document.getElementById("leave-btn").addEventListener("click", () => {
-  socket.emit("leaveRoom", { roomId, playerName });
   window.location.href = "/";
 });
 

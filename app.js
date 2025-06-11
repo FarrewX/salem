@@ -33,9 +33,15 @@ const backendPlayers = {};
 const playerSockets = {}; // ใช้ map ชื่อผู้เล่น -> socket
 const roomCleanupTimers = {}; // roomId -> timeout ID
 const playerCount = 0;
+const hand = [];
 
 io.on('connection', (socket) => {
-  console.log('User connected');
+  socket.on('updatePlayers', ({ roomId, playerName }) => {
+    if (rooms[roomId]?.roomState === 'started') {
+      socket.emit('error', 'ห้องนี้เริ่มเกมไปแล้ว');
+      return;
+    }
+  });
 
   socket.on('createRoom', ({ roomId, playerName }) => {
     if (rooms[roomId]) {
@@ -45,7 +51,6 @@ io.on('connection', (socket) => {
 
     if (!playerSockets[roomId]) playerSockets[roomId] = {};
     playerSockets[roomId][playerName] = socket;
-
 
     rooms[roomId] = {
       players: [playerName],
@@ -221,6 +226,90 @@ io.on('connection', (socket) => {
     return null;
   }
 
+  //สร้าง กองskillcard ตอนเริ่มเกม
+  function generateCardSkill(roomId){
+    class SkillCard {
+      constructor(id, name, description, canTargetSelf = false) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.canTargetSelf = canTargetSelf;
+      }
+    }
+
+    let deck_skillcard = [];
+
+    const salemCardData = [
+      { name: "Investigate", description: "ดูไพ่ Tryal ของผู้เล่น 1 คน", canTargetSelf: false, count: 6 },
+      { name: "Kill", description: "ฆ่า Tryal ใบหนึ่งของผู้เล่น 1 คน", canTargetSelf: false, count: 3 },
+      { name: "Stocks", description: "ทำให้ผู้เล่นไม่สามารถเล่นไพ่ในเทิร์นถัดไป", canTargetSelf: false, count: 5 },
+      { name: "Alibi", description: "ป้องกันการถูก Investigate หรือ Kill", canTargetSelf: true, count: 4 },
+      { name: "Self Defense", description: "ป้องกัน Kill ใส่ตัวเอง", canTargetSelf: true, count: 2 },
+      { name: "Conspiracy", description: "สั่ง Kill โดยไม่เปิดเผย", canTargetSelf: false, count: 3 },
+      { name: "Blackmail", description: "ผู้เล่นที่ถูกเลือกห้ามพูด", canTargetSelf: false, count: 4 },
+      { name: "Scapegoat", description: "โอนผลของ Kill ไปยังผู้เล่นอื่นแบบสุ่ม", canTargetSelf: true, count: 2 },
+      { name: "Pardon", description: "ลบสถานะ Stocks หรือ Blackmail", canTargetSelf: true, count: 2 },
+      { name: "Matchmaker", description: "เชื่อมผู้เล่น 2 คน ให้ชะตาเหมือนกัน", canTargetSelf: false, count: 1 }
+    ];
+
+    // เพิ่มเข้า deck
+    let id = 1;
+    salemCardData.forEach(cardType => {
+      for (let i = 0; i < cardType.count; i++) {
+        deck_skillcard.push(
+          new SkillCard(
+            id++,
+            cardType.name,
+            cardType.description,
+            cardType.canTargetSelf
+          )
+        );
+      }
+    });
+      return deck_skillcard;
+  }
+
+  //จั่วการ์ด
+//   function drawCard(roomId, playerName, numCards = 2) {
+//   const room = rooms[roomId];
+//   if (!room) return;
+
+//   const deck = room.skillDeck;
+//   if (!Array.isArray(deck)) {
+//     console.warn(`❌ room ${roomId} ไม่มี skillDeck`);
+//     return;
+//   }
+
+//   if (!room.playerHands) room.playerHands = {};
+//   if (!room.playerHands[playerName]) room.playerHands[playerName] = [];
+
+//   const hand = room.playerHands[playerName];
+
+//   for (let i = 0; i < numCards && deck.length > 0; i++) {
+//     const card = deck.shift();
+//     hand.push(card);
+//   }
+
+//   room.playerHands[playerName] = hand;
+
+//   const sock = playerSockets[roomId]?.[playerName];
+//   if (sock) {
+//     sock.emit("updateHand", hand);
+//     sock.emit("deckCount", deck.length);
+//   }
+// }
+
+  // ส่งการ์ดให้ผู้เล่น
+  // socket.on('drawCard', () => {
+  //   const roomId = socket.roomId
+  //   const playerName = socket.playerName
+  //   if (!roomId || !playerName) return
+
+  //   drawCard(roomId, playerName)
+  //   socket.emit('updateHand', rooms[roomId].playerHands[playerName])
+  //   io.to(roomId).emit('deckCount', rooms[roomId].skillDeck.length)
+  // })
+
   socket.on("startGame", ({ roomId , playerName }) => {
     const room = rooms[roomId];
     if (!room) return;
@@ -230,51 +319,15 @@ io.on('connection', (socket) => {
       return;
     }
 
-    class SkillCard {
-  constructor(id, name, description, canTargetSelf = false) {
-    this.id = id;
-    this.name = name;
-    this.description = description;
-    this.canTargetSelf = canTargetSelf;
-  }
-}
-
-const deck_skillcard = [];
-
-const salemCardData = [
-  { name: "Investigate", description: "ดูไพ่ Tryal ของผู้เล่น 1 คน", canTargetSelf: false, count: 6 },
-  { name: "Kill", description: "ฆ่า Tryal ใบหนึ่งของผู้เล่น 1 คน", canTargetSelf: false, count: 3 },
-  { name: "Stocks", description: "ทำให้ผู้เล่นไม่สามารถเล่นไพ่ในเทิร์นถัดไป", canTargetSelf: false, count: 5 },
-  { name: "Alibi", description: "ป้องกันการถูก Investigate หรือ Kill", canTargetSelf: true, count: 4 },
-  { name: "Self Defense", description: "ป้องกัน Kill ใส่ตัวเอง", canTargetSelf: true, count: 2 },
-  { name: "Conspiracy", description: "สั่ง Kill โดยไม่เปิดเผย", canTargetSelf: false, count: 3 },
-  { name: "Blackmail", description: "ผู้เล่นที่ถูกเลือกห้ามพูด", canTargetSelf: false, count: 4 },
-  { name: "Scapegoat", description: "โอนผลของ Kill ไปยังผู้เล่นอื่นแบบสุ่ม", canTargetSelf: true, count: 2 },
-  { name: "Pardon", description: "ลบสถานะ Stocks หรือ Blackmail", canTargetSelf: true, count: 2 },
-  { name: "Matchmaker", description: "เชื่อมผู้เล่น 2 คน ให้ชะตาเหมือนกัน", canTargetSelf: false, count: 1 }
-];
-
-// เพิ่มเข้า deck
-let id = 1;
-salemCardData.forEach(cardType => {
-  for (let i = 0; i < cardType.count; i++) {
-    deck_skillcard.push(
-      new SkillCard(
-        id++,
-        cardType.name,
-        cardType.description,
-        cardType.canTargetSelf
-      )
-    );
-  }
-});
-
-console.log(deck_skillcard); // ✅ ได้ครบ ~59 ใบ
-
-
     const playerCount = room.players.length;
     const roles = dealCards(room.players); // แจกไพ่ชีวิต 5 ใบ
-    rooms[roomId].roles = roles;
+    const fullDeck = shuffle(generateCardSkill(roomId));
+    room.roles = roles;
+    room.seatMap = {};
+    room.players.forEach((playerName, index) => {
+      room.seatMap[playerName] = index;
+    });
+    room.roomState = 'started';
 
     // 🔥 บันทึกลงไฟล์
     saveRolesToFile(roomId, roles);
@@ -288,20 +341,47 @@ console.log(deck_skillcard); // ✅ ได้ครบ ~59 ใบ
 
     console.log(`[${new Date().toLocaleString()}] แจกไพ่ให้ห้อง ${roomId}:`, roles);
 
-    io.to(roomId).emit("gameState", {
-      message: "เริ่มเกมแล้ว! แจกไพ่บทบาทเรียบร้อย",
-      players: room.players.map((playerName) => ({ playerName, status: "ปกติ" })),
+    rooms[roomId].players.forEach((playerName) => {
+      const playerSocket = findSocketByName(roomId, playerName);
+      if (playerSocket) {
+        playerSocket.emit("yourSeatIndex", { seatIndex: room.seatMap[playerName] });
+      }
     });
 
+    io.to(roomId).emit("gameState", {
+      message: "เริ่มเกมแล้ว!",
+      players: room.players.map((playerName) => ({ 
+        playerName,
+        seatIndex: room.seatMap[playerName],
+        status: "ปกติ"
+        })),
+    });
+
+    // เก็บไว้ใน memory
+    room.skillDeck = fullDeck;
+
+    console.log(`[${new Date().toLocaleString()}] แจกไพ่สกิลให้ห้อง ${roomId}:`, room.skillDeck);
+
+    // จั่วไพ่เริ่มต้นให้ผู้เล่นทุกคน 3 ใบ
+    // rooms[roomId].players.forEach(playerName => {
+    //   drawCard(roomId, playerName, 3);
+    // });
+
     io.to(roomId).emit("gameStarted");
+    io.to(roomId).emit("skillDeck", room.skillDeck);
   });
 
   socket.on("reconnectToRoom", ({ roomId, playerName }) => {
     socket.playerName = playerName;
     socket.roomId = roomId;
-
     socket.join(roomId);
+    
     console.log(`${playerName} กลับเข้าห้อง ${roomId} อีกครั้ง`);
+
+    if (rooms[roomId]?.roomState === 'started') {
+      socket.emit('error', 'ห้องนี้เริ่มเกมไปแล้ว');
+      return;
+    }
 
     // ยกเลิกการลบห้อง
     if (roomCleanupTimers[roomId]) {
@@ -309,6 +389,10 @@ console.log(deck_skillcard); // ✅ ได้ครบ ~59 ใบ
       delete roomCleanupTimers[roomId];
       console.log(`🚫 ยกเลิกการลบห้อง ${roomId} เพราะมีผู้เล่นกลับเข้ามา`);
     }
+
+     // กู้คืน socket ใหม่
+    if (!playerSockets[roomId]) playerSockets[roomId] = {};
+    playerSockets[roomId][playerName] = socket;
 
     // ⛳️ โหลด roles จากไฟล์
     const roles = loadRolesFromFile(roomId);
@@ -334,39 +418,21 @@ console.log(deck_skillcard); // ✅ ได้ครบ ~59 ใบ
       socket.emit("yourRole", rooms[roomId].roles[playerName]);
     } else {
       console.warn(`⚠️ ไม่มีไพ่ของ ${playerName}`);
+      // console.alert("ไม่พบชื่อผู้เล่น กรุณาลองใหม่อีกครั้ง");
     }
-    console.log(`ส่งไพ่ไปห้อง ${roomId}`,roles);
+    // console.log(`ส่งไพ่ไปห้อง ${roomId}`,roles);
 
-    // ส่งสถานะเกมกลับให้ผู้เล่น
-    const players = rooms[roomId].players;
-    io.to(socket.id).emit("gameState", {
-      players: players.map((playerName) => ({ playerName, status: "ปกติ" })),
-    });
+    // ส่งข้อมูลปัจจุบันกลับให้ผู้เล่น
+    const room = rooms[roomId];
     
-    io.to(roomId).emit('updatePlayers', rooms[roomId].players);
+    io.to(roomId).emit('updatePlayers', room.players);
+    io.to(roomId).emit("skillDeck");
+    io.to(playerName).emit("updateHand", hand);
   });
-
-  // socket.on("endGame", ({ roomId }) => {
-  //   if (!rooms[roomId]) return;
-
-  //   console.log(`🎯 เกมในห้อง ${roomId} จบแล้ว กำลังลบข้อมูลทั้งหมด`);
-
-  //   delete rooms[roomId];
-  //   delete playerSockets[roomId];
-  //   delete backendPlayers[roomId];
-
-  //   const filePath = path.join(__dirname, 'data', `${roomId}_roles.json`);
-  //   if (fs.existsSync(filePath)) {
-  //     fs.unlinkSync(filePath);
-  //     console.log(`🗑️ ลบไฟล์บทบาทของห้อง ${roomId} แล้ว`);
-  //   }
-
-  //   io.to(roomId).emit("gameEnded", { message: "เกมจบแล้ว ขอบคุณที่เล่น!" });
-  // });
 
   console.log(backendPlayers)
 });
 
 setInterval(() => {
   io.emit('updatePlayers', backendPlayers);
-}, 150)
+}, 250)

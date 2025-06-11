@@ -8,23 +8,38 @@ document.getElementById("player-info").innerText = `ชื่อผู้เล�
 
 let myRoles = [];
 
+socket.on("connect", () => {
+  // ถ้ามีข้อมูลห้องเก่า ส่งไปให้ server ฟื้นสถานะ
+  if (roomId && playerName) {
+    socket.emit("reconnectToRoom", { roomId, playerName });
+  }
+});
+
+// รับ role ที่ server ส่งกลับมา
 socket.on("yourRole", (roles) => {
   myRoles = roles;
   renderPlayerCards(); // render เฉพาะเมื่อรู้ role ตัวเอง
 });
 
+// รับสถานะเกม
 socket.on("gameState", (data) => {
+  console.log("ข้อมูลผู้เล่นทั้งหมด:", data.players);
   renderPlayerCards(data.players); // render ทั้งหมดเมื่อมีข้อมูลเกม
 });
 
 socket.emit("reconnectToRoom", { roomId, playerName });
 
 socket.on("updatePlayers", (playerNames) => {
-  // const playerList = playerNames.map(playerNames => ({ playerName: playerNames }));
   const playerList = playerNames.map(name => ({ playerName: name }));
   renderPlayerCards(playerList);
 });
 
+if (!localStorage.getItem("hasReloaded")) {
+  localStorage.setItem("hasReloaded", "true");
+  setTimeout(() => {
+    location.reload();
+  }, 4000);
+}
 
 function renderPlayerCards(playerList = []) {
   const container = document.getElementById("players-container");
@@ -53,3 +68,23 @@ function renderPlayerCards(playerList = []) {
     container.appendChild(playerBox);
   });
 }
+
+socket.on("skillDeck", (deck) => {
+  console.log("ได้วางการ์ดสกิล:", deck);
+  const deckskillContainer  = document.getElementById("cardContainer");
+  deckskillContainer.innerHTML = "";
+  deck.forEach(cardskill => {
+    const cardDiv = document.createElement("div");
+  cardDiv.classList.add("SkillCard");
+  cardDiv.innerHTML = `
+    <strong>${cardskill.name}</strong><br>
+    <small>${cardskill.description}</small>
+  `;
+  deckskillContainer.appendChild(cardDiv);
+  });
+});
+
+socket.on("initDeck", (deck) => {
+  window.currentDeck = deck;
+  renderDeck();
+});
