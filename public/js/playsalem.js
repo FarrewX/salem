@@ -32,14 +32,12 @@ socket.on("gameState", (data) => {
   renderPlayerCards(data.players); // render ทั้งหมดเมื่อมีข้อมูลเกม
 });
 
-socket.emit("reconnectToRoom", { roomId, playerName });
-
 socket.on("updatePlayers", (playerNames) => {
   const playerList = playerNames.map(name => ({ playerName: name }));
   renderPlayerCards(playerList);
 });
 
-function renderPlayerCards(playerList) {
+function renderPlayerCards(playerList = []) {
   const container = document.getElementById("players-container");
   container.innerHTML = ""; // clear ก่อน
 
@@ -68,16 +66,19 @@ function renderPlayerCards(playerList) {
 }
 
 socket.on("skillDeck", (deck) => {
-  console.log("ได้วางการ์ดสกิล:", deck);
-  const deckskillContainer  = document.getElementById("cardContainer");
+  console.log("ได้รับ skillDeck:", deck);
+  const deckskillContainer = document.getElementById("cardContainer");
+  if (!deckskillContainer) return;
   deckskillContainer.innerHTML = "";
-  deck.forEach(SkillCard => {
+
+  // สมมุติว่าข้อมูล deck เป็น array ถูกต้องแล้ว
+  deck.forEach(card => {
     const cardDiv = document.createElement("div");
-    cardDiv.classList.add("SkillCard");
+    cardDiv.classList.add("skill-card");
     cardDiv.innerHTML = `
-    <strong>${SkillCard.name}</strong><br>
-    <small>${SkillCard.description}</small>
-  `;
-  deckskillContainer.appendChild(cardDiv);
+      <strong>${card.name}</strong><br>
+      <small>${card.description}</small>
+    `;
+    deckskillContainer.appendChild(cardDiv);
   });
 });

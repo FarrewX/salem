@@ -32,7 +32,6 @@ const rooms = {};
 const backendPlayers = {};
 const playerSockets = {}; // ใช้ map ชื่อผู้เล่น -> socket
 const roomCleanupTimers = {}; // roomId -> timeout ID
-const playerCount = 0;
 const hand = [];
 
 io.on('connection', (socket) => {
@@ -83,12 +82,6 @@ io.on('connection', (socket) => {
     socket.emit('hostInfo', { isHost });
     io.to(roomId).emit('updatePlayers', rooms[roomId].players);
     io.to(roomId).emit('updatePlayerList', rooms[roomId].players);
-
-    const targetSocket = findSocketByName(roomId, playerName);
-      if (targetSocket) {
-        targetSocket.emit("forceDisconnect", { roomId, message: "ไม่พบชื่อผู้เล่น กรุณาเข้าผ่านลิงก์ที่ถูกต้อง" });
-        targetSocket.disconnect(true);
-      }
   });
 
   socket.on('disconnect', (reason) => {
@@ -117,7 +110,14 @@ io.on('connection', (socket) => {
             fs.unlinkSync(filePath);
             console.log(`🗑️ ลบไฟล์บทบาทของห้อง ${roomId} แล้ว`);
           }
-        }, 2 * 60 * 1000);
+
+          // ลบไฟล์การ์ด
+          const cardsFilePath = path.join(__dirname, 'data', `${roomId}_skillDeck.json`);
+          if (fs.existsSync(cardsFilePath)) {
+            fs.unlinkSync(cardsFilePath);
+            console.log(`🗑️ ลบไฟล์การ์ดของห้อง ${roomId} แล้ว`);
+          }
+        }, 1000 /*2 * 60 * 1000*/);
 
       } else {
         io.to(roomId).emit('updatePlayers', rooms[roomId].players);
@@ -225,19 +225,31 @@ io.on('connection', (socket) => {
     return null;
   }
 
-  //สร้าง กองskillcard ตอนเริ่มเกม
-  function generateCardSkill(roomId){
-    class SkillCard {
-      constructor(id, name, description, canTargetSelf = false) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.canTargetSelf = canTargetSelf;
+  function saveSkillDeckToFile(roomId, skillDeck) {
+    const dir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir);
+    }
+    const filePath = path.join(dir, `${roomId}_skillDeck.json`);
+    fs.writeFileSync(filePath, JSON.stringify(skillDeck, null, 2), 'utf8');
+  }
+
+  function loadSkillDeckFromFile(roomId) {
+    const filePath = path.join(__dirname, 'data', `${roomId}_skillDeck.json`);
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf8');
+      try {
+        return JSON.parse(data);
+      } catch (err) {
+        console.error("Error parsing skillDeck JSON file:", err);
+        return null;
       }
     }
+    return null;
+  }
 
-    let deck_skillcard = [];
-
+  //สร้าง กองskillcard ตอนเริ่มเกม
+  function generateCardSkill(roomId){
     const salemCardData = [
       { name: "Investigate", description: "ดูไพ่ Tryal ของผู้เล่น 1 คน", canTargetSelf: false, count: 6 },
       { name: "Kill", description: "ฆ่า Tryal ใบหนึ่งของผู้เล่น 1 คน", canTargetSelf: false, count: 3 },
@@ -251,21 +263,21 @@ io.on('connection', (socket) => {
       { name: "Matchmaker", description: "เชื่อมผู้เล่น 2 คน ให้ชะตาเหมือนกัน", canTargetSelf: false, count: 1 }
     ];
 
-    // เพิ่มเข้า deck
+    let deck_skillcard = [];
     let id = 1;
+
     salemCardData.forEach(cardType => {
       for (let i = 0; i < cardType.count; i++) {
-        deck_skillcard.push(
-          new SkillCard(
-            id++,
-            cardType.name,
-            cardType.description,
-            cardType.canTargetSelf
-          )
-        );
+        deck_skillcard.push({
+          id: id++,
+          name: cardType.name,
+          description: cardType.description,
+          canTargetSelf: cardType.canTargetSelf
+        });
       }
     });
-      return deck_skillcard;
+
+    return deck_skillcard;
   }
 
   //จั่วการ์ด
@@ -327,8 +339,11 @@ io.on('connection', (socket) => {
       room.seatMap[playerName] = index;
     });
 
+    room.skillDeck = fullDeck;
+
     // 🔥 บันทึกลงไฟล์
     saveRolesToFile(roomId, roles);
+    saveSkillDeckToFile(roomId, room.skillDeck);
 
     room.players.forEach((playerName) => {
       const playerSocket = findSocketByName(roomId, playerName);
@@ -355,8 +370,12 @@ io.on('connection', (socket) => {
         })),
     });
 
-    // เก็บไว้ใน memory
-    room.skillDeck = fullDeck;
+    // const skillDeckPlain = room.skillDeck.map(card => ({
+    //   id: card.id,
+    //   name: card.name,
+    //   description: card.description,
+    //   canTargetSelf: card.canTargetSelf
+    // }));
 
     console.log(`[${new Date().toLocaleString()}] แจกไพ่สกิลให้ห้อง ${roomId}:`, room.skillDeck);
 
@@ -424,10 +443,16 @@ io.on('connection', (socket) => {
 
     // ส่งข้อมูลปัจจุบันกลับให้ผู้เล่น
     const room = rooms[roomId];
+
+    const skillDeck = loadSkillDeckFromFile(roomId);
+    if (skillDeck) {
+      room.skillDeck = skillDeck;
+      socket.emit("skillDeck", skillDeck);
+    }
     
     io.to(roomId).emit('updatePlayers', room.players);
-    io.to(roomId).emit("skillDeck");
-    io.to(playerName).emit("updateHand", hand);
+    io.to(roomId).emit("skillDeck", room.skillDeck);
+    // io.to(playerName).emit("updateHand", hand);
   });
 
   console.log(backendPlayers)

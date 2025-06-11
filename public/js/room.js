@@ -47,11 +47,6 @@ socket.on('updatePlayers', (backendPlayers) => {
   }
 })
 
-socket.on("forceDisconnect", (data) => {
-  window.location.href = "/";
-  alert(data.message || "ไม่พบข้อมูลผู้เล่น");
-});
-
 // ✅ สำหรับชื่อผู้เล่นในห้อง
 socket.on('updatePlayerList', (players) => {
   const list = document.getElementById("player-list");

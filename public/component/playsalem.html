@@ -71,11 +71,14 @@
       justify-content: center;
       margin-top: 20px;
     }
-
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 16px;
+    .skill-card {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 8px;
+      margin: 4px;
+      background-color: #f9f9f9;
+      max-width: 200px;
+      color: #222;
     }
   </style>
 </head>
@@ -89,9 +92,7 @@
 </div>
 <div>
   <h3>Salem Skill Cards</h3>
-  <div id="cardContainer">
-    <div id="SkillCard" class="SkillCard"></div>
-  </div>
+  <div id="cardContainer"></div>
 </div>
 
 <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
