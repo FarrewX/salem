@@ -6,7 +6,24 @@ const playerName = urlParams.get("name");
 
 document.getElementById("player-info").innerText = `ชื่อผู้เล่น: ${playerName}`;
 
+document.getElementById("drawCardBtn").addEventListener("click", drawCard);
+
 let myRoles = [];
+let playerHand = [];
+
+function renderHand() {
+  const handContainer = document.getElementById("handContainer");
+  handContainer.innerHTML = "";
+  playerHand.forEach(card => {
+    const cardDiv = document.createElement("div");
+    cardDiv.classList.add("skill-card");
+    cardDiv.innerHTML = `
+      <strong>${card.name}</strong><br>
+      <small>${card.description}</small>
+    `;
+    handContainer.appendChild(cardDiv);
+  });
+}
 
 socket.on("connect", () => {
   // ถ้ามีข้อมูลห้องเก่า ส่งไปให้ server ฟื้นสถานะ
@@ -82,3 +99,24 @@ socket.on("skillDeck", (deck, index) => {
     deckskillContainer.appendChild(cardDiv);
   });
 });
+
+socket.on("deckSizeUpdate", (count) => {
+  deckSizeElement.innerText = `Deck: ${count} cards`;
+});
+
+socket.on("cardDrawn", (card) => {
+  playerHand.push(card);
+  renderHand();
+});
+
+function drawCard() {
+  socket.emit("drawCard", { roomId, playerName });
+}
+
+socket.on("cardPlayed", ({ from, to, card }) => {
+  // แสดงว่าใครเล่นการ์ดใส่ใคร พร้อมแสดงการ์ด
+  showNotification(`${fromName} played ${card.name} on ${toName}`);
+  revealPlayedCard(card);
+});
+
+socket.on('updateHand', (cards) => {});

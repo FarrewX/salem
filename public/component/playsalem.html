@@ -92,10 +92,21 @@
 </div>
 <div>
   <h3>Salem Skill Cards</h3>
-  <div id="cardContainer"></div>
+  <button id="drawCardBtn">จั่วการ์ด</button>
+  <!-- <div id="cardContainer"></div> -->
+  <div id="cardContainer" onclick="drawCard()">
+    <img src="/images/card-back.png" alt="Deck" />
+    <span id="deckCount">??</span>
+  </div>
+
+  <div id="handContainer"></div>
 </div>
 
 <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 <script src="../js/playsalem.js"></script>
+
+<script>
+  document.getElementById("drawCardBtn").addEventListener("click", drawCard);
+</script>
 </body>
 </html>

@@ -118,6 +118,12 @@ io.on('connection', (socket) => {
             fs.unlinkSync(cardsFilePath);
             console.log(`🗑️ ลบไฟล์การ์ดของห้อง ${roomId} แล้ว`);
           }
+
+          const handsFilePath = path.join(__dirname, 'data', `${roomId}_hands.json`);
+          if (fs.existsSync(handsFilePath)) {
+            fs.unlinkSync(handsFilePath);
+            console.log(`🗑️ ลบไฟล์การ์ดในมือของห้อง ${roomId} แล้ว`);
+          }
         }, 1000 /*2 * 60 * 1000*/);
 
       } else {
@@ -129,16 +135,6 @@ io.on('connection', (socket) => {
 
   delete backendPlayers[socket.playerName];
   });
-
-  // function generateDeck() {
-  //   const deck = [];
-  //   deck.push("แม่มด");
-  //   deck.push("สายตรวจ");
-  //   for (let i = 0; i < 18; i++) {
-  //     deck.push("ชาวบ้าน");
-  //   }
-  //   return deck;
-  // }
   
   function generateDeck(playerCount) {
     const totalCards = playerCount * 5;
@@ -281,46 +277,116 @@ io.on('connection', (socket) => {
     return deck_skillcard;
   }
 
+  // จั่วการ์ดจาก deck file แล้วเพิ่มเข้าไฟล์ hand รวมของผู้เล่น
+  function drawCardFromFileAndSaveToHand(roomId, playerName) {
+    const deckPath = path.join(__dirname, 'data', `${roomId}_skillDeck.json`);
+    const handPath = path.join(__dirname, 'data', `${roomId}_hands.json`);
+
+    if (!fs.existsSync(deckPath)) return null;
+
+    // โหลด skill deck
+    const deck = JSON.parse(fs.readFileSync(deckPath, 'utf8'));
+    if (deck.length === 0) return null;
+
+    const drawnCard = deck.pop(); // ดึงใบสุดท้าย
+
+    // บันทึก deck ที่ลดลง
+    fs.writeFileSync(deckPath, JSON.stringify(deck, null, 2), 'utf8');
+
+    // โหลดมือของทุกคน
+    let hands = {};
+    if (fs.existsSync(handPath)) {
+      hands = JSON.parse(fs.readFileSync(handPath, 'utf8'));
+    }
+
+    if (!hands[playerName]) hands[playerName] = [];
+
+    hands[playerName].push(drawnCard);
+
+    // บันทึกมือของผู้เล่นทุกคน
+    fs.writeFileSync(handPath, JSON.stringify(hands, null, 2), 'utf8');
+
+    return drawnCard;
+  }
+
+  function savePlayerHandsToFile(roomId, playerHands) {
+    const dir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir);
+    }
+    const filePath = path.join(dir, `${roomId}_hands.json`);
+    fs.writeFileSync(filePath, JSON.stringify(playerHands, null, 2), 'utf8');
+  }
+
+  function loadPlayerHandsFromFile(roomId) {
+    const filePath = path.join(__dirname, 'data', `${roomId}_hands.json`);
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf8');
+      try {
+        return JSON.parse(data);
+      } catch (err) {
+        console.error("Error parsing playerHands JSON file:", err);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  // อ่าน & ลบการ์ดจากไฟล์ skill deck
+  // function drawCardFromFileDeck(roomId) {
+  //   const deckPath = path.join(__dirname, `${roomId}_skillDeck.json`);
+  //   if (!fs.existsSync(deckPath)) return null;
+
+  //   const deck = JSON.parse(fs.readFileSync(deckPath, 'utf-8'));
+
+  //   if (deck.length === 0) return null;
+
+  //   const drawnCard = deck.pop();
+  //   fs.writeFileSync(deckPath, JSON.stringify(deck, null, 2));
+
+  //   return drawnCard;
+  // }
+
+  // เพิ่มการ์ดเข้าไฟล์มือผู้เล่น
+  // function addCardToPlayerHand(roomId, playerName, card) {
+  //   const handPath = path.join(__dirname, `${roomId}_${playerName}_hands.json`);
+
+  //   let hand = [];
+  //   if (fs.existsSync(handPath)) {
+  //     hand = JSON.parse(fs.readFileSync(handPath, 'utf-8'));
+  //   }
+
+  //   hand.push(card);
+  //   fs.writeFileSync(handPath, JSON.stringify(hand, null, 2));
+  // }
+
   //จั่วการ์ด
-//   function drawCard(roomId, playerName, numCards = 2) {
-//   const room = rooms[roomId];
-//   if (!room) return;
+  socket.on('drawCard', ({ roomId, playerName }) => {
+    if (!roomId || !playerName) return;
 
-//   const deck = room.skillDeck;
-//   if (!Array.isArray(deck)) {
-//     console.warn(`❌ room ${roomId} ไม่มี skillDeck`);
-//     return;
-//   }
+    const drawnCard = drawCardFromFileAndSaveToHand(roomId, playerName);
+    if (!drawnCard) {
+      socket.emit('error', 'กองการ์ดหมดแล้ว');
+      return;
+    }
 
-//   if (!room.playerHands) room.playerHands = {};
-//   if (!room.playerHands[playerName]) room.playerHands[playerName] = [];
+    socket.emit("cardDrawn", drawnCard);
 
-//   const hand = room.playerHands[playerName];
+    // ส่งมือใหม่กลับ (เฉพาะของผู้เล่นนั้น)
+    const handPath = path.join(__dirname, 'data', `${roomId}_hands.json`);
+    const allHands = fs.existsSync(handPath)
+      ? JSON.parse(fs.readFileSync(handPath, 'utf8'))
+      : {};
+    socket.emit("updateHand", allHands[playerName] || []);
 
-//   for (let i = 0; i < numCards && deck.length > 0; i++) {
-//     const card = deck.shift();
-//     hand.push(card);
-//   }
+    // แจ้งทุกคนว่ากองการ์ดเหลือเท่าไร
+    const deckPath = path.join(__dirname, 'data', `${roomId}_skillDeck.json`);
+    const deck = fs.existsSync(deckPath)
+      ? JSON.parse(fs.readFileSync(deckPath, 'utf8'))
+      : [];
+    io.to(roomId).emit('deckCount', deck.length);
+  });
 
-//   room.playerHands[playerName] = hand;
-
-//   const sock = playerSockets[roomId]?.[playerName];
-//   if (sock) {
-//     sock.emit("updateHand", hand);
-//     sock.emit("deckCount", deck.length);
-//   }
-// }
-
-  // ส่งการ์ดให้ผู้เล่น
-  // socket.on('drawCard', () => {
-  //   const roomId = socket.roomId
-  //   const playerName = socket.playerName
-  //   if (!roomId || !playerName) return
-
-  //   drawCard(roomId, playerName)
-  //   socket.emit('updateHand', rooms[roomId].playerHands[playerName])
-  //   io.to(roomId).emit('deckCount', rooms[roomId].skillDeck.length)
-  // })
 
   socket.on("startGame", ({ roomId , playerName }) => {
     const room = rooms[roomId];
@@ -334,22 +400,28 @@ io.on('connection', (socket) => {
     const playerCount = room.players.length;
     const roles = dealCards(room.players); // แจกไพ่ชีวิต 5 ใบ
     skillDeck = shuffle(generateCardSkill(roomId));
+
     room.roles = roles;
+    room.skillDeck = skillDeck;
+    room.playerHands = {};
+
+    // Map ชื่อเป็นที่นั่ง
     room.seatMap = {};
     room.players.forEach((playerName, index) => {
       room.seatMap[playerName] = index;
     });
 
-    room.skillDeck = skillDeck;
-
-    // 🔥 บันทึกลงไฟล์
+    // บันทึกลงไฟล์
     saveRolesToFile(roomId, roles);
     saveSkillDeckToFile(roomId, room.skillDeck);
+    savePlayerHandsToFile(roomId, room.playerHands);
 
+    // ส่ง role และตำแหน่งที่นั่งให้ผู้เล่น
     room.players.forEach((playerName) => {
       const playerSocket = findSocketByName(roomId, playerName);
       if (playerSocket) {
         playerSocket.emit("yourRole", roles[playerName]);
+        playerSocket.emit("yourSeatIndex", { seatIndex: room.seatMap[playerName] });
       }
     });
 
@@ -365,26 +437,22 @@ io.on('connection', (socket) => {
     io.to(roomId).emit("gameState", {
       message: "เริ่มเกมแล้ว!",
       players: room.players.map((playerName) => ({ 
-        playerName,
+        playerName: playerName,
         seatIndex: room.seatMap[playerName],
         status: "ปกติ"
         })),
     });
 
-    // const skillDeckPlain = room.skillDeck.map(card => ({
-    //   id: card.id,
-    //   name: card.name,
-    //   description: card.description,
-    //   canTargetSelf: card.canTargetSelf
-    // }));
-
     // จั่วไพ่เริ่มต้นให้ผู้เล่นทุกคน 3 ใบ
-    // rooms[roomId].players.forEach(playerName => {
-    //   drawCard(roomId, playerName, 3);
-    // });
+    room.players.forEach((name) => {
+      drawCard(roomId, name, 3);
+      const sock = findSocketByName(roomId, name);
+      if (sock) sock.emit("updateHand", room.playerHands[name]);
+    });
 
     io.to(roomId).emit("gameStarted");
     io.to(roomId).emit("skillDeck", room.skillDeck);
+    io.to(roomId).emit("deckCount", room.skillDeck.length);
     io.to(roomId).emit("forceDisconnect", { message: "ห้องนี้เริ่มเกมแล้ว" })
   });
 
@@ -441,17 +509,45 @@ io.on('connection', (socket) => {
     // ส่งข้อมูลปัจจุบันกลับให้ผู้เล่น
     const room = rooms[roomId];
 
+    //โหลดและส่งการ์ดสกิลเข้าห้อง
     const savedSkillDeck = loadSkillDeckFromFile(roomId);
-    if (savedSkillDeck) {
+    if (savedSkillDeck && rooms[roomId].skillDeck) {
       rooms[roomId].skillDeck = savedSkillDeck;
     } else {
       rooms[roomId].skillDeck = []; // fallback ป้องกัน error
       console.warn(`⚠️ ไม่พบ skillDeck ของห้อง ${roomId}`);
     }
+
+    //โหลดและส่งการ์ดสกิลให้ผู้เล่น
+    const handsFromFile = loadPlayerHandsFromFile(roomId);
+    if (handsFromFile && !rooms[roomId].playerHands) {
+      rooms[roomId].playerHands = handsFromFile;
+    }
+    if (rooms[roomId].playerHands?.[playerName]) {
+      socket.emit("updateHand", rooms[roomId].playerHands[playerName]);
+      console.log(rooms[roomId].playerHands[playerName])
+    }
     
     io.to(roomId).emit('updatePlayers', room.players);
     io.to(roomId).emit("skillDeck", room.skillDeck);
-    // io.to(playerName).emit("updateHand", hand);
+    
+    if (rooms[roomId].playerHands?.[playerName]) {
+      socket.emit("updateHand", rooms[roomId].playerHands[playerName]);
+    }
+  });
+
+  socket.on("playCard", ({ roomId, cardIndex, targetId }) => {
+    const playerName = socket.playerName
+    const room = rooms[roomId];
+
+    const card = playerName.hand.splice(cardIndex, 1)[0]; // Remove from hand
+
+    // ส่งข้อมูลการ์ดที่เล่นให้ทุกคน
+    io.to(roomId).emit("cardPlayed", {
+      from: socket.id,
+      to: targetId,
+      card,
+    });
   });
 
   console.log(backendPlayers)
