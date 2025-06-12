@@ -65,7 +65,7 @@ function renderPlayerCards(playerList = []) {
   });
 }
 
-socket.on("skillDeck", (deck) => {
+socket.on("skillDeck", (deck, index) => {
   console.log("ได้รับ skillDeck:", deck);
   const deckskillContainer = document.getElementById("cardContainer");
   if (!deckskillContainer) return;

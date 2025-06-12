@@ -33,6 +33,7 @@ const backendPlayers = {};
 const playerSockets = {}; // ใช้ map ชื่อผู้เล่น -> socket
 const roomCleanupTimers = {}; // roomId -> timeout ID
 const hand = [];
+let skillDeck = [];
 
 io.on('connection', (socket) => {
   socket.on('createRoom', ({ roomId, playerName }) => {
@@ -332,14 +333,14 @@ io.on('connection', (socket) => {
 
     const playerCount = room.players.length;
     const roles = dealCards(room.players); // แจกไพ่ชีวิต 5 ใบ
-    const fullDeck = shuffle(generateCardSkill(roomId));
+    skillDeck = shuffle(generateCardSkill(roomId));
     room.roles = roles;
     room.seatMap = {};
     room.players.forEach((playerName, index) => {
       room.seatMap[playerName] = index;
     });
 
-    room.skillDeck = fullDeck;
+    room.skillDeck = skillDeck;
 
     // 🔥 บันทึกลงไฟล์
     saveRolesToFile(roomId, roles);
@@ -376,8 +377,6 @@ io.on('connection', (socket) => {
     //   description: card.description,
     //   canTargetSelf: card.canTargetSelf
     // }));
-
-    console.log(`[${new Date().toLocaleString()}] แจกไพ่สกิลให้ห้อง ${roomId}:`, room.skillDeck);
 
     // จั่วไพ่เริ่มต้นให้ผู้เล่นทุกคน 3 ใบ
     // rooms[roomId].players.forEach(playerName => {
@@ -437,17 +436,17 @@ io.on('connection', (socket) => {
         targetSocket.emit("forceDisconnect", { roomId, message: "ไม่พบชื่อผู้เล่น กรุณาเข้าผ่านลิงก์ที่ถูกต้อง" });
         targetSocket.disconnect(true);
       }
-      // socket.disconnect(true);
     }
-    // console.log(`ส่งไพ่ไปห้อง ${roomId}`,roles);
 
     // ส่งข้อมูลปัจจุบันกลับให้ผู้เล่น
     const room = rooms[roomId];
 
-    const skillDeck = loadSkillDeckFromFile(roomId);
-    if (skillDeck) {
-      room.skillDeck = skillDeck;
-      socket.emit("skillDeck", skillDeck);
+    const savedSkillDeck = loadSkillDeckFromFile(roomId);
+    if (savedSkillDeck) {
+      rooms[roomId].skillDeck = savedSkillDeck;
+    } else {
+      rooms[roomId].skillDeck = []; // fallback ป้องกัน error
+      console.warn(`⚠️ ไม่พบ skillDeck ของห้อง ${roomId}`);
     }
     
     io.to(roomId).emit('updatePlayers', room.players);
