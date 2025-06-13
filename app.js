@@ -114,9 +114,7 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('updatePlayers', rooms[roomId].players);
         io.to(roomId).emit('updatePlayerList', rooms[roomId].players);
       }
-
     }
-
   delete backendPlayers[socket.playerName];
   });
   
@@ -241,6 +239,8 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('deckCount', rooms[roomId].skillDeck.length);
 
     console.log(`Player ${playerName} drew a card: ${drawnCard.name} ${drawnCard.description}`);
+    //=====================================
+    // น่าจะทำกลางคืนต่อจากนี้
   });
 
 
@@ -267,17 +267,20 @@ io.on('connection', (socket) => {
     socket.playerName = playerName;
 
     // Map ชื่อเป็นที่นั่ง
+    const shuffledPlayers = shuffle(room.players);
     room.seatMap = {};
-    room.players.forEach((playerName, index) => {
+    shuffledPlayers.forEach((playerName, index) => {
       room.seatMap[playerName] = index;
     });
+
+    console.log("seatMap:", room.seatMap);
 
     // ส่ง role และตำแหน่งที่นั่งให้ผู้เล่น
     room.players.forEach((playerName) => {
       const playerSocket = findSocketByName(roomId, playerName);
       if (playerSocket) {
         playerSocket.emit("yourRole", room.roles[playerName]);
-        playerSocket.emit("yourSeatIndex", { seatIndex: room.seatMap[playerName] });
+        playerSocket.emit("seatMap",  room.seatMap[playerName]);
       }
     });
 
@@ -286,7 +289,7 @@ io.on('connection', (socket) => {
       players: room.players.map((playerName) => ({ 
         playerName: playerName,
         roles: room.roles[playerName],
-        seatIndex: room.seatMap[playerName],
+        seatMap: room.seatMap[playerName],
         status: "ปกติ"
         })),
     });
@@ -338,6 +341,15 @@ io.on('connection', (socket) => {
     // ✅ ใส่ player ลงใน room ถ้ายังไม่มี
     if (!rooms[roomId].players.includes(playerName)) {
       rooms[roomId].players.push(playerName);
+    }
+    
+    // 🔄 ส่งตำแหน่งที่นั่งกลับไปให้ผู้เล่นที่ reconnect
+    const seatIndex = rooms[roomId].seatMap?.[playerName];
+    if (seatIndex !== undefined) {
+      socket.emit("seatMap", seatIndex);
+      console.log(`♻️ ผู้เล่น ${playerName} ได้ที่นั่งเดิม: ${seatIndex}`);
+    } else {
+      console.warn(`⚠️ ยังไม่มี seatMap สำหรับ ${playerName} ในห้อง ${roomId}`);
     }
 
     // ส่งไพ่กลับให้ผู้เล่น
