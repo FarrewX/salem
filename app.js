@@ -5,9 +5,8 @@ const app = express()
 const http = require('http')
 const server = http.createServer(app)
 const { Server } = require("socket.io")
-const io = new Server(server, { pingInterval:2000, pingTimeout: 5000})
+const io = new Server(server, { pingInterval:2000, pingTimeout: 5000, connectionStateRecovery: {}})
 
-const fs = require('fs');
 const path = require('path');
 
 const port = 3000
@@ -32,7 +31,6 @@ const rooms = {};
 const backendPlayers = {};
 const playerSockets = {}; // ใช้ map ชื่อผู้เล่น -> socket
 const roomCleanupTimers = {}; // roomId -> timeout ID
-const hand = [];
 let skillDeck = [];
 
 io.on('connection', (socket) => {
@@ -104,27 +102,13 @@ io.on('connection', (socket) => {
           delete rooms[roomId];
           delete playerSockets[roomId];
           delete backendPlayers[roomId];
+          delete rooms[roomId]?.playerHands;
+          delete rooms[roomId]?.seatMap;
+          delete rooms[roomId]?.skillDeck;
+          delete rooms[roomId]?.roles;
+          delete rooms[roomId]?.host;
           delete roomCleanupTimers[roomId];
-
-          const filePath = path.join(__dirname, 'data', `${roomId}_roles.json`);
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            console.log(`🗑️ ลบไฟล์บทบาทของห้อง ${roomId} แล้ว`);
-          }
-
-          // ลบไฟล์การ์ด
-          const cardsFilePath = path.join(__dirname, 'data', `${roomId}_skillDeck.json`);
-          if (fs.existsSync(cardsFilePath)) {
-            fs.unlinkSync(cardsFilePath);
-            // console.log(`🗑️ ลบไฟล์การ์ดของห้อง ${roomId} แล้ว`);
-          }
-
-          const handsFilePath = path.join(__dirname, 'data', `${roomId}_hands.json`);
-          if (fs.existsSync(handsFilePath)) {
-            fs.unlinkSync(handsFilePath);
-            // console.log(`🗑️ ลบไฟล์การ์ดในมือของห้อง ${roomId} แล้ว`);
-          }
-        }, 1000 /*2 * 60 * 1000*/);
+        }, 1000);
 
       } else {
         io.to(roomId).emit('updatePlayers', rooms[roomId].players);
@@ -192,59 +176,6 @@ io.on('connection', (socket) => {
     return playerSockets[roomId]?.[playerName];
   }
 
-  function saveRolesToFile(roomId, roles) {
-    const dir = path.join(__dirname, 'data');
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir); // สร้างโฟลเดอร์ถ้ายังไม่มี
-    }
-
-    const filePath = path.join(dir, `${roomId}_roles.json`);
-    const data = {
-      timestamp: new Date().toISOString(),
-      roles
-    };
-    fs.writeFileSync(filePath, JSON.stringify({ roles }, null, 2), 'utf8');
-  }
-
-  function loadRolesFromFile(roomId) {
-    const filePath = path.join(__dirname, 'data', `${roomId}_roles.json`);
-    if (fs.existsSync(filePath)) {
-      const data = fs.readFileSync(filePath, 'utf8');
-      try {
-        const parsed = JSON.parse(data);
-        if (parsed.roles) return parsed.roles;
-        return parsed; // fallback
-      } catch (err) {
-        console.error("Error parsing JSON file:", err);
-        return null;
-      }
-    }
-    return null;
-  }
-
-  function saveSkillDeckToFile(roomId, skillDeck) {
-    const dir = path.join(__dirname, 'data');
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir);
-    }
-    const filePath = path.join(dir, `${roomId}_skillDeck.json`);
-    fs.writeFileSync(filePath, JSON.stringify(skillDeck, null, 2), 'utf8');
-  }
-
-  function loadSkillDeckFromFile(roomId) {
-    const filePath = path.join(__dirname, 'data', `${roomId}_skillDeck.json`);
-    if (fs.existsSync(filePath)) {
-      const data = fs.readFileSync(filePath, 'utf8');
-      try {
-        return JSON.parse(data);
-      } catch (err) {
-        console.error("Error parsing skillDeck JSON file:", err);
-        return null;
-      }
-    }
-    return null;
-  }
-
   //สร้าง กองskillcard ตอนเริ่มเกม
   function generateCardSkill(roomId){
     const salemCardData = [
@@ -277,114 +208,39 @@ io.on('connection', (socket) => {
     return deck_skillcard;
   }
 
-  // จั่วการ์ดจาก deck file แล้วเพิ่มเข้าไฟล์ hand รวมของผู้เล่น
-  function drawCardFromFileAndSaveToHand(roomId, playerName) {
-    const deckPath = path.join(__dirname, 'data', `${roomId}_skillDeck.json`);
-    const handPath = path.join(__dirname, 'data', `${roomId}_hands.json`);
+  // จั่วการ์ด
+  function drawCardFromDeck(roomId, playerName) {
+    const room = rooms[roomId];
+    if (!room || !room.skillDeck || room.skillDeck.length === 0) return null;
 
-    if (!fs.existsSync(deckPath)) return null;
+    const card = room.skillDeck.pop(); // ดึงใบสุดท้ายของ deck
 
-    // โหลด skill deck
-    const deck = JSON.parse(fs.readFileSync(deckPath, 'utf8'));
-    if (deck.length === 0) return null;
-
-    const drawnCard = deck.pop(); // ดึงใบสุดท้าย
-
-    // บันทึก deck ที่ลดลง
-    fs.writeFileSync(deckPath, JSON.stringify(deck, null, 2), 'utf8');
-
-    // โหลดมือของทุกคน
-    let hands = {};
-    if (fs.existsSync(handPath)) {
-      hands = JSON.parse(fs.readFileSync(handPath, 'utf8'));
+    if (!room.playerHands[playerName]) {
+      room.playerHands[playerName] = [];
     }
 
-    if (!hands[playerName]) hands[playerName] = [];
-
-    hands[playerName].push(drawnCard);
-
-    // บันทึกมือของผู้เล่นทุกคน
-    fs.writeFileSync(handPath, JSON.stringify(hands, null, 2), 'utf8');
-
-    return drawnCard;
+    room.playerHands[playerName].push(card);
+    return card;
   }
 
-  function savePlayerHandsToFile(roomId, playerHands) {
-    const dir = path.join(__dirname, 'data');
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir);
-    }
-    const filePath = path.join(dir, `${roomId}_hands.json`);
-    fs.writeFileSync(filePath, JSON.stringify(playerHands, null, 2), 'utf8');
-  }
-
-  function loadPlayerHandsFromFile(roomId) {
-    const filePath = path.join(__dirname, 'data', `${roomId}_hands.json`);
-    if (fs.existsSync(filePath)) {
-      const data = fs.readFileSync(filePath, 'utf8');
-      try {
-        return JSON.parse(data);
-      } catch (err) {
-        console.error("Error parsing playerHands JSON file:", err);
-        return null;
-      }
-    }
-    return null;
-  }
-
-  // อ่าน & ลบการ์ดจากไฟล์ skill deck
-  // function drawCardFromFileDeck(roomId) {
-  //   const deckPath = path.join(__dirname, `${roomId}_skillDeck.json`);
-  //   if (!fs.existsSync(deckPath)) return null;
-
-  //   const deck = JSON.parse(fs.readFileSync(deckPath, 'utf-8'));
-
-  //   if (deck.length === 0) return null;
-
-  //   const drawnCard = deck.pop();
-  //   fs.writeFileSync(deckPath, JSON.stringify(deck, null, 2));
-
-  //   return drawnCard;
-  // }
-
-  // เพิ่มการ์ดเข้าไฟล์มือผู้เล่น
-  // function addCardToPlayerHand(roomId, playerName, card) {
-  //   const handPath = path.join(__dirname, `${roomId}_${playerName}_hands.json`);
-
-  //   let hand = [];
-  //   if (fs.existsSync(handPath)) {
-  //     hand = JSON.parse(fs.readFileSync(handPath, 'utf-8'));
-  //   }
-
-  //   hand.push(card);
-  //   fs.writeFileSync(handPath, JSON.stringify(hand, null, 2));
-  // }
-
-  //จั่วการ์ด
+  // จั่วการ์ด
   socket.on('drawCard', ({ roomId, playerName }) => {
     if (!roomId || !playerName) return;
 
-    const drawnCard = drawCardFromFileAndSaveToHand(roomId, playerName);
+    const drawnCard = drawCardFromDeck(roomId, playerName);
+
     if (!drawnCard) {
       socket.emit('error', 'กองการ์ดหมดแล้ว');
       return;
     }
 
     socket.emit("cardDrawn", drawnCard);
+    socket.emit("updateHand", rooms[roomId].playerHands[playerName]);
 
-    // ส่งมือใหม่กลับ (เฉพาะของผู้เล่นนั้น)
-    const handPath = path.join(__dirname, 'data', `${roomId}_hands.json`);
-    const allHands = fs.existsSync(handPath)
-      ? JSON.parse(fs.readFileSync(handPath, 'utf8'))
-      : {};
-    socket.emit("updateHand", allHands[playerName] || []);
+    // แจ้งทุกคนว่ากองการ์ดยังเหลือกี่ใบ
+    io.to(roomId).emit('deckCount', rooms[roomId].skillDeck.length);
 
-    // แจ้งทุกคนว่ากองการ์ดเหลือเท่าไร
-    const deckPath = path.join(__dirname, 'data', `${roomId}_skillDeck.json`);
-    const deck = fs.existsSync(deckPath)
-      ? JSON.parse(fs.readFileSync(deckPath, 'utf8'))
-      : [];
-    io.to(roomId).emit('deckCount', deck.length);
+    console.log(`Player ${playerName} drew a card: ${drawnCard.name} ${drawnCard.description}`);
   });
 
 
@@ -401,9 +257,14 @@ io.on('connection', (socket) => {
     const roles = dealCards(room.players); // แจกไพ่ชีวิต 5 ใบ
     skillDeck = shuffle(generateCardSkill(roomId));
 
-    room.roles = roles;
-    room.skillDeck = skillDeck;
-    room.playerHands = {};
+    rooms[roomId].roles = roles;
+    rooms[roomId].skillDeck = skillDeck;
+    rooms[roomId].playerHands = {};
+    rooms[roomId].playerCount = playerCount;
+    rooms[roomId].seatMap = {};
+
+    socket.roomId = roomId;
+    socket.playerName = playerName;
 
     // Map ชื่อเป็นที่นั่ง
     room.seatMap = {};
@@ -411,25 +272,11 @@ io.on('connection', (socket) => {
       room.seatMap[playerName] = index;
     });
 
-    // บันทึกลงไฟล์
-    saveRolesToFile(roomId, roles);
-    saveSkillDeckToFile(roomId, room.skillDeck);
-    savePlayerHandsToFile(roomId, room.playerHands);
-
     // ส่ง role และตำแหน่งที่นั่งให้ผู้เล่น
     room.players.forEach((playerName) => {
       const playerSocket = findSocketByName(roomId, playerName);
       if (playerSocket) {
-        playerSocket.emit("yourRole", roles[playerName]);
-        playerSocket.emit("yourSeatIndex", { seatIndex: room.seatMap[playerName] });
-      }
-    });
-
-    // console.log(`[${new Date().toLocaleString()}] แจกไพ่ให้ห้อง ${roomId}:`, roles);
-
-    rooms[roomId].players.forEach((playerName) => {
-      const playerSocket = findSocketByName(roomId, playerName);
-      if (playerSocket) {
+        playerSocket.emit("yourRole", room.roles[playerName]);
         playerSocket.emit("yourSeatIndex", { seatIndex: room.seatMap[playerName] });
       }
     });
@@ -438,6 +285,7 @@ io.on('connection', (socket) => {
       message: "เริ่มเกมแล้ว!",
       players: room.players.map((playerName) => ({ 
         playerName: playerName,
+        roles: room.roles[playerName],
         seatIndex: room.seatMap[playerName],
         status: "ปกติ"
         })),
@@ -447,6 +295,8 @@ io.on('connection', (socket) => {
     io.to(roomId).emit("skillDeck", room.skillDeck);
     io.to(roomId).emit("deckCount", room.skillDeck.length);
     io.to(roomId).emit("forceDisconnect", { message: "ห้องนี้เริ่มเกมแล้ว" })
+
+    console.log(`ส่งการ์ดไปห้อง ${roomId} = ${room.skillDeck} จำนวน ${room.skillDeck.length} ใบ`)
   });
 
   socket.on("reconnectToRoom", ({ roomId, playerName }) => {
@@ -467,19 +317,23 @@ io.on('connection', (socket) => {
     if (!playerSockets[roomId]) playerSockets[roomId] = {};
     playerSockets[roomId][playerName] = socket;
 
-    // ⛳️ โหลด roles จากไฟล์
-    const roles = loadRolesFromFile(roomId);
-
     // ✅ สร้าง room object ถ้าไม่มี
     if (!rooms[roomId]) {
       rooms[roomId] = {
         players: [],
-        roles: roles || {},
+        roles: {},
         host: null,
+        skillDeck: {},
+        playerHands: {},
+        seatMap: {},
       };
     } else if (!rooms[roomId].roles && roles) {
       rooms[roomId].roles = roles; // โหลดเข้า memory ถ้ายังไม่มี
     }
+
+    // ⛳️ โหลด role
+    const roles = rooms[roomId]?.roles || {};
+    console.log(`🔍 โหลด role ของ ${playerName} ในห้อง ${roomId}:`, roles[playerName]);
 
     // ✅ ใส่ player ลงใน room ถ้ายังไม่มี
     if (!rooms[roomId].players.includes(playerName)) {
@@ -503,22 +357,22 @@ io.on('connection', (socket) => {
     const room = rooms[roomId];
 
     //โหลดและส่งการ์ดสกิลเข้าห้อง
-    const savedSkillDeck = loadSkillDeckFromFile(roomId);
-    if (savedSkillDeck && rooms[roomId].skillDeck) {
-      rooms[roomId].skillDeck = savedSkillDeck;
-    } else {
+    const savedSkillDeck = rooms[roomId].skillDeck;
+    if (savedSkillDeck) {
+      socket.emit("skillDeck", savedSkillDeck);
+    }else {
       rooms[roomId].skillDeck = []; // fallback ป้องกัน error
       console.warn(`⚠️ ไม่พบ skillDeck ของห้อง ${roomId}`);
     }
 
     //โหลดและส่งการ์ดสกิลให้ผู้เล่น
-    const handsFromFile = loadPlayerHandsFromFile(roomId);
-    if (handsFromFile && !rooms[roomId].playerHands) {
-      rooms[roomId].playerHands = handsFromFile;
+    const handplayer = rooms[roomId].playerHands[playerName];
+    if (handplayer && !rooms[roomId].playerHands[playerName]) {
+      rooms[roomId].playerHands = handplayer;
     }
     if (rooms[roomId].playerHands?.[playerName]) {
       socket.emit("updateHand", rooms[roomId].playerHands[playerName]);
-      // console.log(rooms[roomId].playerHands[playerName])
+      console.log(rooms[roomId].playerHands[playerName])
     }
     
     io.to(roomId).emit('updatePlayers', room.players);
@@ -533,11 +387,12 @@ io.on('connection', (socket) => {
     const playerName = socket.playerName
     const room = rooms[roomId];
 
-    const card = playerName.hand.splice(cardIndex, 1)[0]; // Remove from hand
+    const hand = rooms[roomId]?.playerHands?.[playerName] || [];
+    const card = hand.splice(cardIndex, 1)[0];
 
     // ส่งข้อมูลการ์ดที่เล่นให้ทุกคน
     io.to(roomId).emit("cardPlayed", {
-      from: socket.id,
+      from: socket.roomId,
       to: targetId,
       card,
     });
