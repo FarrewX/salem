@@ -116,13 +116,13 @@ io.on('connection', (socket) => {
           const cardsFilePath = path.join(__dirname, 'data', `${roomId}_skillDeck.json`);
           if (fs.existsSync(cardsFilePath)) {
             fs.unlinkSync(cardsFilePath);
-            console.log(`🗑️ ลบไฟล์การ์ดของห้อง ${roomId} แล้ว`);
+            // console.log(`🗑️ ลบไฟล์การ์ดของห้อง ${roomId} แล้ว`);
           }
 
           const handsFilePath = path.join(__dirname, 'data', `${roomId}_hands.json`);
           if (fs.existsSync(handsFilePath)) {
             fs.unlinkSync(handsFilePath);
-            console.log(`🗑️ ลบไฟล์การ์ดในมือของห้อง ${roomId} แล้ว`);
+            // console.log(`🗑️ ลบไฟล์การ์ดในมือของห้อง ${roomId} แล้ว`);
           }
         }, 1000 /*2 * 60 * 1000*/);
 
@@ -425,7 +425,7 @@ io.on('connection', (socket) => {
       }
     });
 
-    console.log(`[${new Date().toLocaleString()}] แจกไพ่ให้ห้อง ${roomId}:`, roles);
+    // console.log(`[${new Date().toLocaleString()}] แจกไพ่ให้ห้อง ${roomId}:`, roles);
 
     rooms[roomId].players.forEach((playerName) => {
       const playerSocket = findSocketByName(roomId, playerName);
@@ -454,7 +454,7 @@ io.on('connection', (socket) => {
     socket.roomId = roomId;
     socket.join(roomId);
     
-    console.log(`${playerName} กลับเข้าห้อง ${roomId} อีกครั้ง`);
+    // console.log(`${playerName} กลับเข้าห้อง ${roomId} อีกครั้ง`);
 
     // ยกเลิกการลบห้อง
     if (roomCleanupTimers[roomId]) {
@@ -518,7 +518,7 @@ io.on('connection', (socket) => {
     }
     if (rooms[roomId].playerHands?.[playerName]) {
       socket.emit("updateHand", rooms[roomId].playerHands[playerName]);
-      console.log(rooms[roomId].playerHands[playerName])
+      // console.log(rooms[roomId].playerHands[playerName])
     }
     
     io.to(roomId).emit('updatePlayers', room.players);
@@ -548,7 +548,7 @@ io.on('connection', (socket) => {
     socket.emit("updateHand", hand);
   });
 
-  console.log(backendPlayers)
+  // console.log(backendPlayers)
 });
 
 setInterval(() => {

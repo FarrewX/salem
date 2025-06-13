@@ -4,26 +4,25 @@ const urlParams = new URLSearchParams(window.location.search);
 const roomId = urlParams.get("roomId");
 const playerName = urlParams.get("name");
 
+let myRoles = [];
+let playerHand = [];
+let showHand = true;
+
 document.getElementById("player-info").innerText = `ชื่อผู้เล่น: ${playerName}`;
 
 document.getElementById("drawCardBtn").addEventListener("click", drawCard);
 
 document.getElementById("showHandBtn").addEventListener("click", () => {
-  socket.emit("requestHand", { roomId, playerName });
-  renderHand();
-});
-
-let myRoles = [];
-let playerHand = [];
-let showHand = false;
-
-document.getElementById("showHandBtn").addEventListener("click", () => {
   showHand = !showHand;
+  socket.emit("requestHand", { roomId, playerName });
   const handContainer = document.getElementById("handContainer");
+  const showHandBtn = document.getElementById("showHandBtn");
   if (showHand) {
     renderHand();
-    handContainer.style.display = "block";
+    showHandBtn.innerHTML = "ซ่อนการ์ดการ์ดบนมือ";
+    handContainer.style.display = "flex";
   } else {
+    showHandBtn.innerHTML = "แสดงการ์ดการ์ดบนมือ";
     handContainer.style.display = "none";
   }
 });
@@ -100,21 +99,28 @@ function renderPlayerCards(playerList = []) {
 }
 
 socket.on("skillDeck", (deck, index) => {
-  console.log("ได้รับ skillDeck:", deck);
+  // console.log("ได้รับ skillDeck:", deck);
   const deckskillContainer = document.getElementById("cardContainer");
   if (!deckskillContainer) return;
+  const drawCard = document.createElement("drawCardBtn");
+  if(deck.length > 0){
   deckskillContainer.innerHTML = "";
-
-  // สมมุติว่าข้อมูล deck เป็น array ถูกต้องแล้ว
-  deck.forEach(card => {
-    const cardDiv = document.createElement("div");
-    cardDiv.classList.add("skill-card");
-    cardDiv.innerHTML = `
-      <strong>${card.name}</strong><br>
-      <small>${card.description}</small>
+  drawCard.classList.add("div");
+  drawCard.innerHTML = `
+      <h7>CARD</h7><br>
+      <h9>Salem</h9>
     `;
-    deckskillContainer.appendChild(cardDiv);
-  });
+  deckskillContainer.appendChild(drawCard);
+  }
+  if(deck.length === 0){
+    deckskillContainer.innerHTML = "";
+    drawCard.classList.add("div");
+    drawCard.innerHTML = `
+        <h7>CARD</h7><br>
+        <h9>None</h9>
+      `;
+    deckskillContainer.appendChild(drawCard);
+  }
 });
 
 socket.on("deckSizeUpdate", (count) => {
