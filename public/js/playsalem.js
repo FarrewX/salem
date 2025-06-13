@@ -8,8 +8,25 @@ document.getElementById("player-info").innerText = `ชื่อผู้เล�
 
 document.getElementById("drawCardBtn").addEventListener("click", drawCard);
 
+document.getElementById("showHandBtn").addEventListener("click", () => {
+  socket.emit("requestHand", { roomId, playerName });
+  renderHand();
+});
+
 let myRoles = [];
 let playerHand = [];
+let showHand = false;
+
+document.getElementById("showHandBtn").addEventListener("click", () => {
+  showHand = !showHand;
+  const handContainer = document.getElementById("handContainer");
+  if (showHand) {
+    renderHand();
+    handContainer.style.display = "block";
+  } else {
+    handContainer.style.display = "none";
+  }
+});
 
 function renderHand() {
   const handContainer = document.getElementById("handContainer");
@@ -119,4 +136,7 @@ socket.on("cardPlayed", ({ from, to, card }) => {
   revealPlayedCard(card);
 });
 
-socket.on('updateHand', (cards) => {});
+socket.on('updateHand', (cards) => {
+  playerHand = cards;
+  renderHand();
+});

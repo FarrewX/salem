@@ -443,13 +443,6 @@ io.on('connection', (socket) => {
         })),
     });
 
-    // จั่วไพ่เริ่มต้นให้ผู้เล่นทุกคน 3 ใบ
-    room.players.forEach((name) => {
-      drawCard(roomId, name, 3);
-      const sock = findSocketByName(roomId, name);
-      if (sock) sock.emit("updateHand", room.playerHands[name]);
-    });
-
     io.to(roomId).emit("gameStarted");
     io.to(roomId).emit("skillDeck", room.skillDeck);
     io.to(roomId).emit("deckCount", room.skillDeck.length);
@@ -548,6 +541,11 @@ io.on('connection', (socket) => {
       to: targetId,
       card,
     });
+  });
+
+  socket.on("requestHand", ({ roomId, playerName }) => {
+    const hand = rooms[roomId]?.playerHands[playerName] || [];
+    socket.emit("updateHand", hand);
   });
 
   console.log(backendPlayers)
